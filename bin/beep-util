@@ -11,7 +11,7 @@ calc() {
   # http://stackoverflow.com/a/14171828
 
   # 'awk' sets 'scale' for 'bc', and adds '\n'
-  awk 'BEGIN { print "scale = 20" } { print }' | bc -ls
+  awk 'BEGIN { print "scale = 20" } { print }' | bc -ls | tr -d '\n'
 }
 
 # test `printf '%s' '3.25 + 2.25' | calc` = '5.50' && printf 'OK\n' || printf 'FAIL\n'
@@ -70,14 +70,43 @@ cent_to_freq() {
 # test `printf '%s' '200' | freq_to_cent | cent_to_freq | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | fix 3` = `printf '%s' $cent_base' / 2' | fix 3` && printf 'OK\n' || printf 'FAIL\n'
 
+# stream
+# Print arguments to STDOUT (like 'echo')
+stream() {
+
+  while test $# -ge 1 ; do
+    printf '%s ' "$1"
+    shift
+  done | sed 's/ $/\n/'
+}
+
+# test "`stream 100 200 300`" = "100 200 300" && printf 'OK\n' || printf 'FAIL\n'
+
 # arpeggio
-# Generate an arpeggio from a sequence of sounds
+# Generate an arpeggio from a sequence of tones
 arpeggio() {
 
   awk 'BEGIN { ORS = " " } { for (i = 1; i <= NF; i++) print $i, "'$1'", "0" }' | sed 's/ $/\n/'
 }
 
 # test "`printf '%s' '100 200 300' | arpeggio 50`" = "100 50 0 200 50 0 300 50 0" && printf 'OK\n' || printf 'FAIL\n'
+
+# repeat
+# Repeat a sequence of triplets $1 times
+repeat() {
+
+  local i
+  local c
+  i=$1
+  c=`cat`
+  while test $i -ge 1 ; do
+    printf '%s ' "$c"
+    i=`expr $i - 1`
+  done | sed 's/ $/\n/'
+}
+
+# test "`stream 100 200 300 | repeat 3`" = "100 200 300 100 200 300 100 200 300" && printf 'OK\n' || printf 'FAIL\n'
+# test "x`stream 100 200 300 | repeat 0`x" = "xx" && printf 'OK\n' || printf 'FAIL\n'
 
 # add_const
 # Add a number to a constant
@@ -183,6 +212,48 @@ scale_tempo() {
 
 # test "`printf '%s' '100 50 30 200 50 30 300 50 30' | scale_tempo 2`" = "100 100 60 200 100 60 300 100 60" && printf 'OK\n' || printf 'FAIL\n'
 
+# map
+# Apply a transformation to each number in a sequence
+map() {
+
+  local i
+  for i in `cat` ; do
+
+    stream "$i" | "$@" | tr -d '\n'
+    printf ' '
+  done | sed 's/ $/\n/'
+}
+
+gradient() {
+
+  local f0
+  local fint
+  local t0
+  local d
+  f0=$1
+  fint=$2
+  t0=$3
+  d=`stream "$t0 / $4" | calc`
+  shift 4
+
+  local t
+  t=0
+
+  while test `stream "if (($t + $d) <= $t0) 1; if (($t + $d) > $t0) 0;" | calc` = 1 ; do
+
+    # Cents
+    stream "$t / $t0" | calc | "$@" | mult_const "$fint" | add_const "$f0"
+
+    # Duration and delay
+    printf ' %s 0 ' "$d"
+
+    t=`stream "$t + $d" | calc`
+  done | sed 's/ $/\n/'
+}
+
+# test "`gradient 0 100 1000 5 calc | map round`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0" && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 -100 1000 5 calc | map round`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0" && printf 'OK\n' || printf 'FAIL\n'
+
 # compile
 # Convert sets of (cents, duration, delay) into 'beep' arguments
 compile() {
@@ -207,7 +278,7 @@ compile() {
     elif test $count = 2 ; then
 
       # Delay
-      if test $i -ge 1 ; then
+      if test `stream "$i" | round` -ge 1 ; then
         printf '%s' ' -D '
         printf '%s' "$i" | round
       fi
