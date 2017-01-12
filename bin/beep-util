@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# http://superuser.com/a/232692
+modprobe pcspkr
+
+# calc
+# Evaluate mathematical expression
+calc() {
+
+  # Input to 'bc' must terminate with '\n'
+  # http://stackoverflow.com/a/14171828
+
+  # 'awk' sets 'scale' for 'bc', and adds a '\n' for us
+  awk 'BEGIN { print "scale = 20" } { print }' | bc -ls
+}
+
+# test `printf '%s' '3.25 + 2.25' | calc` = '5.50' && printf 'OK\n' || printf 'FAIL\n'
+
+# fix
+# Evaluate expression and round to '$1' decimal digits
+fix() {
+
+  calc | awk '{ printf "%.'$1'f", $0 }'
+
+  # Alternatives:
+  #
+  # calc | python -c 'print format(round(float(raw_input()), '$d'), ".'$d'f")'
+}
+
+# test `printf '%s' '34.5236' | fix 3` = '34.524' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' 'e (1.5 * l (2))' | fix 9` = '2.828427125' && printf 'OK\n' || printf 'FAIL\n'
+
+# round
+# Evaluate expression and round to nearest integer
+round() {
+
+  fix 0
+}
+
+# test `printf '%s' '-34 - 0.6' | round` = '-35' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '-34 - 0.4' | round` = '-34' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '34.6' | round` = '35' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '34.4' | round` = '34' && printf 'OK\n' || printf 'FAIL\n'
+
+# Base frequency for 'cent' values is 261.625565Hz (middle C).
+# https://en.wikipedia.org/wiki/Cent_(music)
+cent_base=261.625565
+cent_offset=`printf '%s' "l ($cent_base)" | calc`
+cent_mult=`printf '%s' "1200 / (l (2))" | calc`
+
+# freq_to_cent
+# Convert frequency to cents (relative to $cent_base)
+freq_to_cent() {
+  awk '{ print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }'
+}
+
+# test `printf '%s' '500 + 67.8' | freq_to_cent | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '200' | freq_to_cent | fix 3` = '-465.004' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' $cent_base' / 2' | freq_to_cent | fix 3` = '-1200.000' && printf 'OK\n' || printf 'FAIL\n'
+
+# cent_to_freq
+# Convert cents (relative to $cent_base) to frequency
+cent_to_freq() {
+  awk '{ print "e ((", $0, " / '$cent_mult') + '$cent_offset')" }'
+}
+
+# test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '200' | freq_to_cent | cent_to_freq | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | fix 3` = `printf '%s' $cent_base' / 2' | fix 3` && printf 'OK\n' || printf 'FAIL\n'
