@@ -223,3 +223,45 @@ compile() {
 }
 
 # test "X`printf '%s' '0 50 0 200 50 50 400 50 0' | compile`X" = "X-f 262 -l 50 -n -f 294 -l 50 -D 50 -n -f 330 -l 50X" && printf 'OK\n' || printf 'FAIL\n'
+
+# play
+# Play a stream of <cent, duration, delay> triplets with 'beep'
+play() {
+
+  # Kill background 'beep' job if we receive an interrupt
+  # http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#trap
+  trap 'kill -INT $pid ; exit 1' INT TERM
+
+  local i
+  local c
+  local count
+  local pid
+  c=
+  count=0
+  pid=
+  for i in `cat` ; do
+
+    c="$c $i"
+    count=`expr $count + 1`
+
+    if test $count = 3 ; then
+
+      # Compile triplet
+      c=`printf '%s' "$c" | compile`
+
+      # Compilation complete. Wait for background 'beep' to complete, if any.
+      wait
+
+      # Run 'beep' in background while we compile the next triplet
+      beep $c &
+      pid=$!
+
+      c=
+      count=0
+    fi
+  done
+
+  # STDIN is exhausted. Wait for background 'beep' to complete, if any.
+  wait
+  trap - INT TERM
+}
