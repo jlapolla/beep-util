@@ -67,3 +67,25 @@ cent_to_freq() {
 # test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' '200' | freq_to_cent | cent_to_freq | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | fix 3` = `printf '%s' $cent_base' / 2' | fix 3` && printf 'OK\n' || printf 'FAIL\n'
+
+# compile
+# Convert sets of (frequency, duration, delay) into 'beep' arguments
+compile() {
+
+  while test $# -ge 3 ; do
+    printf '%s' '-f '
+    printf '%s' "$1" | cent_to_freq | round
+    printf '%s' ' -l '
+    printf '%s' "$2"
+    if test $3 -ge 1 ; then
+      printf '%s' ' -D '
+      printf '%s' "$3"
+    fi
+    shift 3
+    if test $# -ge 3 ; then
+      printf '%s' ' -n '
+    fi
+  done
+}
+
+# test "X`compile 0 50 0 200 50 50 400 50 0`X" = "X-f 262 -l 50 -n -f 294 -l 50 -D 50 -n -f 330 -l 50X" && printf 'OK\n' || printf 'FAIL\n'
