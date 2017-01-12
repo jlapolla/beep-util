@@ -17,28 +17,28 @@ calc() {
 # test `printf '%s' '3.25 + 2.25' | calc` = '5.50' && printf 'OK\n' || printf 'FAIL\n'
 
 # fix
-# Evaluate expression and round to '$1' decimal digits
+# Round number to '$1' decimal digits
 fix() {
 
-  calc | awk 'BEGIN { ORS = "" } { printf "%.'$1'f", $0 }'
+  awk 'BEGIN { ORS = "" } { printf "%.'$1'f", $0 }'
 
   # Alternatives:
   #
   # calc | python -c 'print format(round(float(raw_input()), '$d'), ".'$d'f")'
 }
 
-# test `printf '%s' '34.5236' | fix 3` = '34.524' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' 'e (1.5 * l (2))' | fix 9` = '2.828427125' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '34.5236' | calc | fix 3` = '34.524' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' 'e (1.5 * l (2))' | calc | fix 3` = '2.828' && printf 'OK\n' || printf 'FAIL\n'
 
 # round
-# Evaluate expression and round to nearest integer
+# Round number to nearest integer
 round() {
 
   fix 0
 }
 
-# test `printf '%s' '-34 - 0.6' | round` = '-35' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '-34 - 0.4' | round` = '-34' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '-34 - 0.6' | calc | round` = '-35' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '-34 - 0.4' | calc | round` = '-34' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' '34.6' | round` = '35' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' '34.4' | round` = '34' && printf 'OK\n' || printf 'FAIL\n'
 
@@ -52,23 +52,23 @@ cent_mult=`printf '%s' "1200 / (l (2))" | calc`
 # Convert frequency to cents (relative to $cent_base)
 freq_to_cent() {
 
-  awk 'BEGIN { ORS = "" } { print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }' | calc
+  awk 'BEGIN { ORS = "" } { print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }'
 }
 
-# test `printf '%s' '500 + 67.8' | freq_to_cent | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '200' | freq_to_cent | fix 3` = '-465.004' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' $cent_base' / 2' | freq_to_cent | fix 3` = '-1200.000' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '500 + 67.8' | freq_to_cent | calc | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '200' | freq_to_cent | calc | fix 3` = '-465.004' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' $cent_base' / 2' | freq_to_cent | calc | fix 3` = '-1200.000' && printf 'OK\n' || printf 'FAIL\n'
 
 # cent_to_freq
 # Convert cents (relative to $cent_base) to frequency
 cent_to_freq() {
 
-  awk 'BEGIN { ORS = "" } { print "e ((", $0, " / '$cent_mult') + '$cent_offset')" }' | calc
+  awk 'BEGIN { ORS = "" } { print "e (((", $0, ") / '$cent_mult') + '$cent_offset')" }'
 }
 
-# test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '200' | freq_to_cent | cent_to_freq | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | fix 3` = `printf '%s' $cent_base' / 2' | fix 3` && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | calc | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '200' | freq_to_cent | cent_to_freq | calc | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | calc | fix 3` = `printf '%s' $cent_base' / 2' | calc | fix 3` && printf 'OK\n' || printf 'FAIL\n'
 
 # stream
 # Print arguments to STDOUT (like 'echo')
@@ -109,21 +109,21 @@ repeat() {
 # Add a number to a constant
 add_const() {
 
-  awk 'BEGIN { ORS = " " } { print $0, " + ('$1')" }' | calc
+  awk 'BEGIN { ORS = "" } { print "(", $0, ") + ('$1')" }'
 }
 
-# test `printf '%s' '100' | add_const 5` = "105" && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '100' | add_const -5` = "95" && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '100' | add_const 5 | calc` = "105" && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '100' | add_const -5 | calc` = "95" && printf 'OK\n' || printf 'FAIL\n'
 
 # mult_const
 # Multiply a number by a constant
 mult_const() {
 
-  awk 'BEGIN { ORS = " " } { print $0, " * ('$1')" }' | calc
+  awk 'BEGIN { ORS = "" } { print "(", $0, ") * ('$1')" }'
 }
 
-# test `printf '%s' '100' | mult_const 5` = "500" && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '100' | mult_const -5` = "-500" && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '100' | mult_const 5 | calc` = "500" && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '100' | mult_const -5 | calc` = "-500" && printf 'OK\n' || printf 'FAIL\n'
 
 # map_tones
 # Apply a transformation to each tone in a sequence
@@ -207,7 +207,7 @@ scale_tempo() {
   map_durations mult_const "$1" | map_delays mult_const "$1"
 }
 
-# test "`printf '%s' '100 50 30 200 50 30 300 50 30' | scale_tempo 2`" = "100 100 60 200 100 60 300 100 60" && printf 'OK\n' || printf 'FAIL\n'
+# test "`printf '%s' '100 50 30 200 50 30 300 50 30' | scale_tempo 2`" = "100 100 60 200 100 60 300 100 60 " && printf 'OK\n' || printf 'FAIL\n'
 
 # map
 # Apply a transformation to each number in a sequence
@@ -216,7 +216,7 @@ map() {
   local i
   for i in `cat` ; do
 
-    stream "$i" | "$@" | calc
+    stream "$i" | "$@"
     printf ' '
   done
 }
@@ -239,7 +239,7 @@ gradient() {
   while test `stream "if (($t + $d) <= $t0) 1; if (($t + $d) > $t0) 0;" | calc` = 1 ; do
 
     # Cents
-    stream "$t / $t0" | calc | "$@" | mult_const "$fint" | add_const "$f0"
+    stream "$t / $t0" | "$@" | mult_const "$fint" | add_const "$f0" | calc
 
     # Duration and delay
     printf ' %s 0 ' "$d"
@@ -272,7 +272,7 @@ compile() {
 
       # Tone
       printf '%s' '-f '
-      printf '%s' "$i" | cent_to_freq | round
+      printf '%s' "$i" | cent_to_freq | calc | round
 
     elif test $count = 1 ; then
 
