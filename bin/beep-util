@@ -20,7 +20,7 @@ calc() {
 # Evaluate expression and round to '$1' decimal digits
 fix() {
 
-  calc | awk '{ printf "%.'$1'f", $0 }'
+  calc | awk 'BEGIN { ORS = "" } { printf "%.'$1'f", $0 }'
 
   # Alternatives:
   #
@@ -52,7 +52,7 @@ cent_mult=`printf '%s' "1200 / (l (2))" | calc`
 # Convert frequency to cents (relative to $cent_base)
 freq_to_cent() {
 
-  awk '{ print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }' | calc
+  awk 'BEGIN { ORS = "" } { print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }' | calc
 }
 
 # test `printf '%s' '500 + 67.8' | freq_to_cent | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
@@ -63,7 +63,7 @@ freq_to_cent() {
 # Convert cents (relative to $cent_base) to frequency
 cent_to_freq() {
 
-  awk '{ print "e ((", $0, " / '$cent_mult') + '$cent_offset')" }' | calc
+  awk 'BEGIN { ORS = "" } { print "e ((", $0, " / '$cent_mult') + '$cent_offset')" }' | calc
 }
 
 # test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
@@ -74,22 +74,19 @@ cent_to_freq() {
 # Print arguments to STDOUT (like 'echo')
 stream() {
 
-  while test $# -ge 1 ; do
-    printf '%s ' "$1"
-    shift
-  done | sed 's/ $/\n/'
+  printf '%s ' "$@"
 }
 
-# test "`stream 100 200 300`" = "100 200 300" && printf 'OK\n' || printf 'FAIL\n'
+# test "`stream 100 200 300`" = "100 200 300 " && printf 'OK\n' || printf 'FAIL\n'
 
 # arpeggio
 # Generate an arpeggio from a sequence of tones
 arpeggio() {
 
-  awk 'BEGIN { ORS = " " } { for (i = 1; i <= NF; i++) print $i, "'$1'", "0" }' | sed 's/ $/\n/'
+  awk 'BEGIN { ORS = " " } { for (i = 1; i <= NF; i++) print $i, "'$1'", "0" }'
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50`" = "100 50 0 200 50 0 300 50 0" && printf 'OK\n' || printf 'FAIL\n'
+# test "`printf '%s' '100 200 300' | arpeggio 50`" = "100 50 0 200 50 0 300 50 0 " && printf 'OK\n' || printf 'FAIL\n'
 
 # repeat
 # Repeat a sequence of triplets $1 times
@@ -102,17 +99,17 @@ repeat() {
   while test $i -ge 1 ; do
     printf '%s ' "$c"
     i=`expr $i - 1`
-  done | sed 's/ $/\n/'
+  done
 }
 
-# test "`stream 100 200 300 | repeat 3`" = "100 200 300 100 200 300 100 200 300" && printf 'OK\n' || printf 'FAIL\n'
+# test "`stream 100 200 300 | repeat 3`" = "100 200 300  100 200 300  100 200 300  " && printf 'OK\n' || printf 'FAIL\n'
 # test "x`stream 100 200 300 | repeat 0`x" = "xx" && printf 'OK\n' || printf 'FAIL\n'
 
 # add_const
 # Add a number to a constant
 add_const() {
 
-  awk '{ print $0, " + ('$1')" }' | calc
+  awk 'BEGIN { ORS = " " } { print $0, " + ('$1')" }' | calc
 }
 
 # test `printf '%s' '100' | add_const 5` = "105" && printf 'OK\n' || printf 'FAIL\n'
@@ -122,7 +119,7 @@ add_const() {
 # Multiply a number by a constant
 mult_const() {
 
-  awk '{ print $0, " * ('$1')" }' | calc
+  awk 'BEGIN { ORS = " " } { print $0, " * ('$1')" }' | calc
 }
 
 # test `printf '%s' '100' | mult_const 5` = "500" && printf 'OK\n' || printf 'FAIL\n'
@@ -138,7 +135,7 @@ map_tones() {
   for i in `cat` ; do
 
     if test $count = 0 ; then
-      printf '%s' "$i" | "$@" | tr -d '\n'
+      printf '%s' "$i" | "$@" | calc
       printf ' '
     else
       printf '%s ' "$i"
@@ -148,10 +145,10 @@ map_tones() {
     if test $count = 3 ; then
       count=0
     fi
-  done | sed 's/ $/\n/'
+  done
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50 | map_tones add_const 30`" = "130 50 0 230 50 0 330 50 0" && printf 'OK\n' || printf 'FAIL\n'
+# test "`printf '%s' '100 200 300' | arpeggio 50 | map_tones add_const 30`" = "130 50 0 230 50 0 330 50 0 " && printf 'OK\n' || printf 'FAIL\n'
 
 # map_durations
 # Apply a transformation to each duration in a sequence
@@ -163,7 +160,7 @@ map_durations() {
   for i in `cat` ; do
 
     if test $count = 1 ; then
-      printf '%s' "$i" | "$@" | tr -d '\n'
+      printf '%s' "$i" | "$@" | calc
       printf ' '
     else
       printf '%s ' "$i"
@@ -173,10 +170,10 @@ map_durations() {
     if test $count = 3 ; then
       count=0
     fi
-  done | sed 's/ $/\n/'
+  done
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50 | map_durations add_const 30`" = "100 80 0 200 80 0 300 80 0" && printf 'OK\n' || printf 'FAIL\n'
+# test "`printf '%s' '100 200 300' | arpeggio 50 | map_durations add_const 30`" = "100 80 0 200 80 0 300 80 0 " && printf 'OK\n' || printf 'FAIL\n'
 
 # map_delays
 # Apply a transformation to each delay in a sequence
@@ -188,7 +185,7 @@ map_delays() {
   for i in `cat` ; do
 
     if test $count = 2 ; then
-      printf '%s' "$i" | "$@" | tr -d '\n'
+      printf '%s' "$i" | "$@" | calc
       printf ' '
     else
       printf '%s ' "$i"
@@ -198,16 +195,16 @@ map_delays() {
     if test $count = 3 ; then
       count=0
     fi
-  done | sed 's/ $/\n/'
+  done
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50 | map_delays add_const 30`" = "100 50 30 200 50 30 300 50 30" && printf 'OK\n' || printf 'FAIL\n'
+# test "`printf '%s' '100 200 300' | arpeggio 50 | map_delays add_const 30`" = "100 50 30 200 50 30 300 50 30 " && printf 'OK\n' || printf 'FAIL\n'
 
 # scale_tempo
 # Scale durations and delays by a factor
 scale_tempo() {
 
-  map_durations mult_const $1 | map_delays mult_const $1
+  map_durations mult_const "$1" | map_delays mult_const "$1"
 }
 
 # test "`printf '%s' '100 50 30 200 50 30 300 50 30' | scale_tempo 2`" = "100 100 60 200 100 60 300 100 60" && printf 'OK\n' || printf 'FAIL\n'
@@ -219,9 +216,9 @@ map() {
   local i
   for i in `cat` ; do
 
-    stream "$i" | "$@" | tr -d '\n'
+    stream "$i" | "$@" | calc
     printf ' '
-  done | sed 's/ $/\n/'
+  done
 }
 
 gradient() {
@@ -248,11 +245,11 @@ gradient() {
     printf ' %s 0 ' "$d"
 
     t=`stream "$t + $d" | calc`
-  done | sed 's/ $/\n/'
+  done
 }
 
-# test "`gradient 0 100 1000 5 calc | map round`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0" && printf 'OK\n' || printf 'FAIL\n'
-# test "`gradient 0 -100 1000 5 calc | map round`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0" && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 100 1000 5 calc | map round`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 -100 1000 5 calc | map round`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
 
 # compile
 # Convert sets of (cents, duration, delay) into 'beep' arguments
@@ -260,8 +257,16 @@ compile() {
 
   local i
   local count
+  local first
   count=0
+  first=1
   for i in `cat` ; do
+
+    if test $first = 1 ; then
+      first=0
+    elif test $count = 0 ; then
+      printf '%s' ' -n '
+    fi
 
     if test $count = 0 ; then
 
@@ -282,7 +287,6 @@ compile() {
         printf '%s' ' -D '
         printf '%s' "$i" | round
       fi
-      printf '%s' ' -n '
 
     fi
 
@@ -290,7 +294,7 @@ compile() {
     if test $count = 3 ; then
       count=0
     fi
-  done | sed 's/ -n $/\n/'
+  done
 }
 
 # test "X`printf '%s' '0 50 0 200 50 50 400 50 0' | compile`X" = "X-f 262 -l 50 -n -f 294 -l 50 -D 50 -n -f 330 -l 50X" && printf 'OK\n' || printf 'FAIL\n'
