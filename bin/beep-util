@@ -10,7 +10,7 @@ calc() {
   # Input to 'bc' must terminate with '\n'
   # http://stackoverflow.com/a/14171828
 
-  # 'awk' sets 'scale' for 'bc', and adds a '\n' for us
+  # 'awk' sets 'scale' for 'bc', and adds '\n'
   awk 'BEGIN { print "scale = 20" } { print }' | bc -ls
 }
 
@@ -51,7 +51,8 @@ cent_mult=`printf '%s' "1200 / (l (2))" | calc`
 # freq_to_cent
 # Convert frequency to cents (relative to $cent_base)
 freq_to_cent() {
-  awk '{ print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }'
+
+  awk '{ print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }' | calc
 }
 
 # test `printf '%s' '500 + 67.8' | freq_to_cent | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
@@ -61,12 +62,107 @@ freq_to_cent() {
 # cent_to_freq
 # Convert cents (relative to $cent_base) to frequency
 cent_to_freq() {
-  awk '{ print "e ((", $0, " / '$cent_mult') + '$cent_offset')" }'
+
+  awk '{ print "e ((", $0, " / '$cent_mult') + '$cent_offset')" }' | calc
 }
 
 # test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' '200' | freq_to_cent | cent_to_freq | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
 # test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | fix 3` = `printf '%s' $cent_base' / 2' | fix 3` && printf 'OK\n' || printf 'FAIL\n'
+
+# arpeggio
+# Generate an arpeggio from a sequence of sounds
+arpeggio() {
+
+  awk 'BEGIN { ORS = " " } { for (i = 1; i <= NF; i++) print $i, "'$1'", "0" }' | sed 's/ $/\n/'
+}
+
+# test "`printf '%s' '100 200 300' | arpeggio 50`" = "100 50 0 200 50 0 300 50 0" && printf 'OK\n' || printf 'FAIL\n'
+
+# add_const
+# Add a numeric constant to a number
+add_const() {
+
+  awk '{ print $0, " + ('$1')" }' | calc
+}
+
+# test `printf '%s' '100' | add_const 5` = "105" && printf 'OK\n' || printf 'FAIL\n'
+# test `printf '%s' '100' | add_const -5` = "95" && printf 'OK\n' || printf 'FAIL\n'
+
+# map_tones
+# Apply a transformation to each tone in a sequence
+map_tones() {
+
+  local i
+  local count
+  count=0
+  for i in `awk '{ print }'` ; do
+
+    if test $count = 0 ; then
+      printf '%s' "$i" | "$@" | tr -d '\n'
+      printf ' '
+    else
+      printf '%s ' "$i"
+    fi
+
+    count=`expr $count + 1`
+    if test $count = 3 ; then
+      count=0
+    fi
+  done | sed 's/ $/\n/'
+}
+
+# test "`printf '%s' '100 200 300' | arpeggio 50 | map_tones add_const 30`" = "130 50 0 230 50 0 330 50 0" && printf 'OK\n' || printf 'FAIL\n'
+
+# map_durations
+# Apply a transformation to each duration in a sequence
+map_durations() {
+
+  local i
+  local count
+  count=0
+  for i in `awk '{ print }'` ; do
+
+    if test $count = 1 ; then
+      printf '%s' "$i" | "$@" | tr -d '\n'
+      printf ' '
+    else
+      printf '%s ' "$i"
+    fi
+
+    count=`expr $count + 1`
+    if test $count = 3 ; then
+      count=0
+    fi
+  done | sed 's/ $/\n/'
+}
+
+# test "`printf '%s' '100 200 300' | arpeggio 50 | map_durations add_const 30`" = "100 80 0 200 80 0 300 80 0" && printf 'OK\n' || printf 'FAIL\n'
+
+# map_delays
+# Apply a transformation to each delay in a sequence
+map_delays() {
+
+  local i
+  local count
+  count=0
+  for i in `awk '{ print }'` ; do
+
+    if test $count = 2 ; then
+      printf '%s' "$i" | "$@" | tr -d '\n'
+      printf ' '
+    else
+      printf '%s ' "$i"
+    fi
+
+    count=`expr $count + 1`
+    if test $count = 3 ; then
+      count=0
+    fi
+  done | sed 's/ $/\n/'
+}
+
+# test "`printf '%s' '100 200 300' | arpeggio 50 | map_delays add_const 30`" = "100 50 30 200 50 30 300 50 30" && printf 'OK\n' || printf 'FAIL\n'
 
 # compile
 # Convert sets of (frequency, duration, delay) into 'beep' arguments
