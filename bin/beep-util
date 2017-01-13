@@ -3,32 +3,99 @@
 # http://superuser.com/a/232692
 modprobe pcspkr
 
+# map
+# Apply a function to each line in a stream
+map_lines() {
+  local line
+
+  while read line ; do
+
+    echo "$line" | $@
+  done
+}
+
+map_field() {
+  local buffer count i line num
+
+  num=$1
+  shift
+  while read line ; do
+
+    buffer=
+    count=1
+    for i in $line ; do
+
+      if [ $count = $num ] ; then
+
+        buffer="$buffer $(echo $i | $@)"
+      else
+
+        buffer="$buffer $i"
+      fi
+
+      count=$(($count + 1))
+    done
+
+    echo $buffer
+  done
+}
+
+# join_lines
+# Join each set of $1 lines in a stream into a single line
+join_lines() {
+  local buffer count line
+
+  buffer=
+  count=0
+  while read line ; do
+
+    buffer="$buffer $line"
+    count=$(($count + 1))
+    if [ $count = $1 ] ; then
+
+      echo $buffer
+      buffer=
+      count=0
+    fi
+  done
+
+  if [ "$buffer" ] ; then
+
+    echo $buffer
+  fi
+}
+
 # calc
 # Evaluate mathematical expression
 calc() {
+  local line
 
   # Input to 'bc' must terminate with '\n'
   # http://stackoverflow.com/a/14171828
+  {
+    echo scale = 20
+    while read line ; do
 
-  # 'awk' sets 'scale' for 'bc', and adds '\n'
-  awk 'BEGIN { print "scale = 20" } { print }' | bc -ls | tr -d '\n'
+      echo "$line"
+    done
+  } | bc -ls
 }
 
-# test `printf '%s' '3.25 + 2.25' | calc` = '5.50' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '3.25 + 2.25' | calc` = '5.50' && printf 'OK\n' || printf 'FAIL\n'
 
 # fix
 # Round number to '$1' decimal digits
 fix() {
+  local line
 
-  awk 'BEGIN { ORS = "" } { printf "%.'$1'f", $0 }'
+  while read line ; do
 
-  # Alternatives:
-  #
-  # calc | python -c 'print format(round(float(raw_input()), '$d'), ".'$d'f")'
+    printf '%.'$1'f\n' $line
+  done
 }
 
-# test `printf '%s' '34.5236' | calc | fix 3` = '34.524' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' 'e (1.5 * l (2))' | calc | fix 3` = '2.828' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '34.5236' | calc | fix 3` = '34.524' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo 'e (1.5 * l (2))' | calc | fix 3` = '2.828' && printf 'OK\n' || printf 'FAIL\n'
 
 # round
 # Round number to nearest integer
@@ -37,38 +104,46 @@ round() {
   fix 0
 }
 
-# test `printf '%s' '-34 - 0.6' | calc | round` = '-35' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '-34 - 0.4' | calc | round` = '-34' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '34.6' | round` = '35' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '34.4' | round` = '34' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '-34 - 0.6' | calc | round` = '-35' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '-34 - 0.4' | calc | round` = '-34' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '34.6' | round` = '35' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '34.4' | round` = '34' && printf 'OK\n' || printf 'FAIL\n'
 
 # Base frequency for 'cent' values is 261.625565Hz (middle C).
 # https://en.wikipedia.org/wiki/Cent_(music)
 cent_base=261.625565
-cent_offset=`printf '%s' "l ($cent_base)" | calc`
-cent_mult=`printf '%s' "1200 / (l (2))" | calc`
+cent_offset=`echo "l ($cent_base)" | calc`
+cent_mult=`echo "1200 / (l (2))" | calc`
 
 # freq_to_cent
 # Convert frequency to cents (relative to $cent_base)
 freq_to_cent() {
+  local line
 
-  awk 'BEGIN { ORS = "" } { print "(l (", $0, ") - '$cent_offset') * '$cent_mult'" }'
+  while read line ; do
+
+    echo '(l ('"$line"') - '"$cent_offset"') * '"$cent_mult"
+  done
 }
 
-# test `printf '%s' '500 + 67.8' | freq_to_cent | calc | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '200' | freq_to_cent | calc | fix 3` = '-465.004' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' $cent_base' / 2' | freq_to_cent | calc | fix 3` = '-1200.000' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '500 + 67.8' | freq_to_cent | calc | fix 3` = '1341.455' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '200' | freq_to_cent | calc | fix 3` = '-465.004' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo $cent_base' / 2' | freq_to_cent | calc | fix 3` = '-1200.000' && printf 'OK\n' || printf 'FAIL\n'
 
 # cent_to_freq
 # Convert cents (relative to $cent_base) to frequency
 cent_to_freq() {
+  local line
 
-  awk 'BEGIN { ORS = "" } { print "e (((", $0, ") / '$cent_mult') + '$cent_offset')" }'
+  while read line ; do
+
+    echo 'e ((('"$line"') / '"$cent_mult"') + '"$cent_offset"')'
+  done
 }
 
-# test `printf '%s' '500 + 67.8' | freq_to_cent | cent_to_freq | calc | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '200' | freq_to_cent | cent_to_freq | calc | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' $cent_base' / 2' | freq_to_cent | cent_to_freq | calc | fix 3` = `printf '%s' $cent_base' / 2' | calc | fix 3` && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '500 + 67.8' | freq_to_cent | cent_to_freq | calc | fix 3` = '567.800' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '200' | freq_to_cent | cent_to_freq | calc | fix 3` = '200.000' && printf 'OK\n' || printf 'FAIL\n'
+# test `echo $cent_base' / 2' | freq_to_cent | cent_to_freq | calc | fix 3` = `echo $cent_base' / 2' | calc | fix 3` && printf 'OK\n' || printf 'FAIL\n'
 
 # stream
 # Print arguments to STDOUT (like 'echo')
@@ -77,179 +152,134 @@ stream() {
   printf '%s ' "$@"
 }
 
-# test "`stream 100 200 300`" = "100 200 300 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`echo 100 200 300`" = "100 200 300" && printf 'OK\n' || printf 'FAIL\n'
 
 # arpeggio
 # Generate an arpeggio from a sequence of tones
 arpeggio() {
+  local i line
 
-  awk 'BEGIN { ORS = " " } { for (i = 1; i <= NF; i++) print $i, "'$1'", "0" }'
+  while read line ; do
+
+    for i in $line ; do
+
+      echo $i $1 0
+    done
+  done
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50`" = "100 50 0 200 50 0 300 50 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`echo '100\n200\n300' | arpeggio 50`" = "`echo '100 50 0\n200 50 0\n300 50 0'`" && printf 'OK\n' || printf 'FAIL\n'
 
 # reverse
 # Reverse all triplets in a sequence
-reverse() {
+reverse_lines() {
+  local buffer line
 
-  local i
-  local c
-  local buff
-  local count
-  i=
-  c=
-  buff=
-  count=0
-  for i in `cat` ; do
+  buffer=
+  while read line ; do
 
-    c="$c $i"
-    count=`expr $count + 1`
-
-    if test $count = 3 ; then
-
-      buff="$c $buff"
-      c=
-      count=0
-    fi
+    buffer="$line
+$buffer"
   done
 
-  stream $buff
+  printf '%s' "$buffer"
 }
 
-# test "`stream 100 50 0 200 50 0 300 50 0 | reverse`" = "300 50 0 200 50 0 100 50 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`printf '100 50 0\n200 50 0\n300 50 0\n' | reverse_lines`" = "`printf '300 50 0\n200 50 0\n100 50 0\n'`" && printf 'OK\n' || printf 'FAIL\n'
 
 # repeat
 # Repeat a sequence of triplets $1 times
 repeat() {
+  local i buffer line
 
-  local i
-  local c
   i=$1
-  c=`cat`
+  buffer=
   while test $i -ge 1 ; do
-    printf '%s ' "$c"
-    i=`expr $i - 1`
+
+    if [ "$buffer" ] ; then
+
+      printf '%s' "$buffer"
+    else
+
+      while read line ; do
+
+        echo "$line"
+        buffer="$buffer$line
+"
+      done
+    fi
+    i=$(($i - 1))
   done
 }
 
-# test "`stream 100 200 300 | repeat 3`" = "100 200 300  100 200 300  100 200 300  " && printf 'OK\n' || printf 'FAIL\n'
-# test "x`stream 100 200 300 | repeat 0`x" = "xx" && printf 'OK\n' || printf 'FAIL\n'
+# test "`echo 100 200 300 | repeat 3`" = "`echo '100 200 300\n100 200 300\n100 200 300'`" && printf 'OK\n' || printf 'FAIL\n'
+# test "x`echo 100 200 300 | repeat 0`x" = "xx" && printf 'OK\n' || printf 'FAIL\n'
 
 # add_const
 # Add a number to a constant
 add_const() {
+  local line
 
-  awk 'BEGIN { ORS = "" } { print "(", $0, ") + ('$1')" }'
+  while read line ; do
+
+    echo '('"$line"') + ('"$1"')' | calc
+  done
 }
 
-# test `printf '%s' '100' | add_const 5 | calc` = "105" && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '100' | add_const -5 | calc` = "95" && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '100' | add_const 5 | calc` = "105" && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '100' | add_const -5 | calc` = "95" && printf 'OK\n' || printf 'FAIL\n'
 
 # mult_const
 # Multiply a number by a constant
 mult_const() {
+  local line
 
-  awk 'BEGIN { ORS = "" } { print "(", $0, ") * ('$1')" }'
+  while read line ; do
+
+    echo '('"$line"') * ('"$1"')' | calc
+  done
 }
 
-# test `printf '%s' '100' | mult_const 5 | calc` = "500" && printf 'OK\n' || printf 'FAIL\n'
-# test `printf '%s' '100' | mult_const -5 | calc` = "-500" && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '100' | mult_const 5 | calc` = "500" && printf 'OK\n' || printf 'FAIL\n'
+# test `echo '100' | mult_const -5 | calc` = "-500" && printf 'OK\n' || printf 'FAIL\n'
 
 # map_tones
 # Apply a transformation to each tone in a sequence
 map_tones() {
 
-  local i
-  local count
-  count=0
-  for i in `cat` ; do
-
-    if test $count = 0 ; then
-      printf '%s' "$i" | "$@" | calc
-      printf ' '
-    else
-      printf '%s ' "$i"
-    fi
-
-    count=`expr $count + 1`
-    if test $count = 3 ; then
-      count=0
-    fi
-  done
+  map_field 1 "$@"
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50 | map_tones add_const 30`" = "130 50 0 230 50 0 330 50 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`echo '100 200 300' | arpeggio 50 | map_tones add_const 30`" = "`echo '130 50 0\n230 50 0\n330 50 0'`" && printf 'OK\n' || printf 'FAIL\n'
 
 # map_durations
 # Apply a transformation to each duration in a sequence
 map_durations() {
 
-  local i
-  local count
-  count=0
-  for i in `cat` ; do
-
-    if test $count = 1 ; then
-      printf '%s' "$i" | "$@" | calc
-      printf ' '
-    else
-      printf '%s ' "$i"
-    fi
-
-    count=`expr $count + 1`
-    if test $count = 3 ; then
-      count=0
-    fi
-  done
+  map_field 2 "$@"
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50 | map_durations add_const 30`" = "100 80 0 200 80 0 300 80 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`echo '100 200 300' | arpeggio 50 | map_durations add_const 30`" = "`echo '100 80 0\n200 80 0\n300 80 0'`" && printf 'OK\n' || printf 'FAIL\n'
 
 # map_delays
 # Apply a transformation to each delay in a sequence
 map_delays() {
 
-  local i
-  local count
-  count=0
-  for i in `cat` ; do
-
-    if test $count = 2 ; then
-      printf '%s' "$i" | "$@" | calc
-      printf ' '
-    else
-      printf '%s ' "$i"
-    fi
-
-    count=`expr $count + 1`
-    if test $count = 3 ; then
-      count=0
-    fi
-  done
+  map_field 3 "$@"
 }
 
-# test "`printf '%s' '100 200 300' | arpeggio 50 | map_delays add_const 30`" = "100 50 30 200 50 30 300 50 30 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`echo '100 200 300' | arpeggio 50 | map_delays add_const 30`" = "`echo '100 50 30\n200 50 30\n300 50 30'`" && printf 'OK\n' || printf 'FAIL\n'
 
 # scale_tempo
 # Scale durations and delays by a factor
 scale_tempo() {
+  local m
 
-  map_durations mult_const "$1" | map_delays mult_const "$1"
+  m="`echo '1 / ('$1')' | calc`"
+  map_durations mult_const $m | map_delays mult_const $m
 }
 
-# test "`printf '%s' '100 50 30 200 50 30 300 50 30' | scale_tempo 2`" = "100 100 60 200 100 60 300 100 60 " && printf 'OK\n' || printf 'FAIL\n'
-
-# map
-# Apply a transformation to each number in a sequence
-map() {
-
-  local i
-  for i in `cat` ; do
-
-    stream "$i" | "$@"
-    printf ' '
-  done
-}
+# test "`echo '100 50 30\n200 50 30\n300 50 30' | scale_tempo 0.5 | round | join_lines 3`" = "`echo '100 100 60\n200 100 60\n300 100 60'`" && printf 'OK\n' || printf 'FAIL\n'
 
 # curve_line
 # Linear curve for use with 'gradient'
@@ -259,7 +289,7 @@ curve_line() {
 }
 
 # 2 * pi
-two_pi=`stream "8 * (a (1))" | calc`
+two_pi=`echo "8 * (a (1))" | calc`
 
 # curve_sin
 # Sine curve for use with 'gradient'
@@ -276,7 +306,7 @@ curve_cos() {
 }
 
 # ln (0.05)
-ln_0p05=`stream "l (0.05)" | calc`
+ln_0p05=`echo "l (0.05)" | calc`
 
 # curve_exp
 # Exponential decay curve for use with 'gradient'
@@ -312,8 +342,8 @@ gradient() {
   done
 }
 
-# test "`gradient 0 100 1000 5 curve_line | map round`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
-# test "`gradient 0 -100 1000 5 curve_line | map round`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 100 1000 5 curve_line | map round | join_lines 3`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 -100 1000 5 curve_line | map round | join_lines 3`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
 
 # compile
 # Convert sets of (cents, duration, delay) into 'beep' arguments
@@ -361,7 +391,7 @@ compile() {
   done
 }
 
-# test "X`printf '%s' '0 50 0 200 50 50 400 50 0' | compile`X" = "X-f 262 -l 50 -n -f 294 -l 50 -D 50 -n -f 330 -l 50X" && printf 'OK\n' || printf 'FAIL\n'
+# test "X`echo '0 50 0 200 50 50 400 50 0' | compile`X" = "X-f 262 -l 50 -n -f 294 -l 50 -D 50 -n -f 330 -l 50X" && printf 'OK\n' || printf 'FAIL\n'
 
 # play
 # Play a stream of <cent, duration, delay> triplets with 'beep'
