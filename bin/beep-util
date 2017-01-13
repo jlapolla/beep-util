@@ -251,6 +251,40 @@ map() {
   done
 }
 
+# curve_line
+# Linear curve for use with 'gradient'
+curve_line() {
+
+  cat
+}
+
+# 2 * pi
+two_pi=`stream "8 * (a (1))" | calc`
+
+# curve_sin
+# Sine curve for use with 'gradient'
+curve_sin() {
+
+  awk 'BEGIN { ORS = "" } { print "s ('$two_pi' * (", $0, "))" }'
+}
+
+# curve_cos
+# Cosine curve for use with 'gradient'
+curve_cos() {
+
+  awk 'BEGIN { ORS = "" } { print "c ('$two_pi' * (", $0, "))" }'
+}
+
+# ln (0.05)
+ln_0p05=`stream "l (0.05)" | calc`
+
+# curve_exp
+# Exponential decay curve for use with 'gradient'
+curve_exp() {
+
+  awk 'BEGIN { ORS = "" } { print "1 - (e ('$ln_0p05' * (", $0, ")))" }'
+}
+
 gradient() {
 
   local f0
@@ -278,8 +312,8 @@ gradient() {
   done
 }
 
-# test "`gradient 0 100 1000 5 calc | map round`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
-# test "`gradient 0 -100 1000 5 calc | map round`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 100 1000 5 curve_line | map round`" = "0 200 0 20 200 0 40 200 0 60 200 0 80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
+# test "`gradient 0 -100 1000 5 curve_line | map round`" = "0 200 0 -20 200 0 -40 200 0 -60 200 0 -80 200 0 " && printf 'OK\n' || printf 'FAIL\n'
 
 # compile
 # Convert sets of (cents, duration, delay) into 'beep' arguments
@@ -369,4 +403,38 @@ play() {
   # STDIN is exhausted. Wait for background 'beep' to complete, if any.
   wait
   trap - INT TERM
+}
+
+# beep_script
+# Ouput an executable 'beep' script with at most $1 triplets per line
+beep_script() {
+
+  local i
+  local c
+  local count
+  c=
+  count=0
+  for i in `cat` ; do
+
+    c="$c $i"
+    count=`expr $count + 1`
+
+    if test $count = `expr $1 + $1 + $1` ; then
+
+      stream beep
+      stream "$c" | compile
+      printf '\n'
+
+      c=
+      count=0
+    fi
+  done
+
+  # Output any remaining beep commands
+  if test "X$c" != "X" ; then
+
+    stream beep
+    stream "$c" | compile
+    printf '\n'
+  fi
 }
